@@ -1,8 +1,8 @@
 #!/bin/bash
 set -e
 
-GDCM_SRC_DIR="../../third_party/gdcm"
-BUILD_DIR="../../build/gdcm"
+GDCM_SRC_DIR="third_party/gdcm"
+BUILD_DIR="build/gdcm"
 
 mkdir -p "$BUILD_DIR"
 
@@ -14,3 +14,6 @@ cmake -S "$GDCM_SRC_DIR" -B "$BUILD_DIR" \
   -DGDCM_BUILD_TESTING=OFF
 
 cmake --build "$BUILD_DIR" --parallel
+
+# Copy necessary .a files and headers
+cp build/gdcm/bin/libgdcm*.a third_party/prebuilt/darwin_arm64/
