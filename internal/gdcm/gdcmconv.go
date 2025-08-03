@@ -1,7 +1,5 @@
 package gdcm
 
-//go:generate ../../scripts/build_gdcm.sh
-
 /*
 #cgo CXXFLAGS: -std=c++11
 #cgo CXXFLAGS: -I${SRCDIR}/../../third_party/gdcm/Source/Attribute
