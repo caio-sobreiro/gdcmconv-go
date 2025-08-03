@@ -1,3 +1,0 @@
-package gdcm
-
-import "C"

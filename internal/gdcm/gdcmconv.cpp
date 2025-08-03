@@ -1,68 +1,3 @@
-/*=========================================================================
-
-  Program: GDCM (Grassroots DICOM). A DICOM library
-
-  Copyright (c) 2006-2011 Mathieu Malaterre
-  All rights reserved.
-  See Copyright.txt or http://gdcm.sourceforge.net/Copyright.html for details.
-
-     This software is distributed WITHOUT ANY WARRANTY; without even
-     the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-     PURPOSE.  See the above copyright notice for more information.
-
-=========================================================================*/
-/*
- * HISTORY:
- * In GDCM 1.X the preferred term was 'ReWrite', however one author of GDCM dislike
- * the term ReWrite since it is associated with the highly associated with the Rewrite
- * notion in software programming where using reinvent the wheel and rewrite from scratch code
- * the term convert was preferred
- *
- * Tools to conv. Goals being to 'purify' a DICOM file.
- * For now it will do the minimum:
- * - If Group Length is present, the length is guarantee to be correct
- * - If Element with Group Tag 0x1, 0x3, 0x5 or 0x7 are present they are
- *   simply discarded (not written).
- * - Elements are written in alphabetical order
- * - 32bits VR have the residue bytes sets to 0x0,0x0
- * - Same goes from Item Length end delimiter, sets to 0x0,0x0
- * - All buggy files (wrong length: GE, 13 and Siemens Leonardo) are fixed
- * - All size are even (no odd length from gdcm 1.x)
- *
- * // \todo:
- * // --preamble: clean preamble
- * // --meta: clean meta (meta info version...)
- * // --dicomV3 (use TS unless not supported)
- * // --recompute group-length
- * // --undefined sq
- * // --explicit sq *
- * \todo in a close future:
- * - Set appropriate VR from DICOM dict
- * - Rewrite PMS SQ into DICOM SQ
- * - Rewrite Implicit SQ with defined length as undefined length
- * - PixelData with `overlay` in unused bits should be cleanup
- * - Any broken JPEG file (wrong bits) should be fixed
- * - DicomObject bug should be fixed
- * - Meta and Dataset should have a matching UID (more generally File Meta
- *   should be correct (Explicit!) and consistent with DataSet)
- * - User should be able to specify he wants Group Length (or remove them)
- * - Media SOP should be correct (deduct from something else or set to
- *   SOP Secondary if all else fail).
- * - Padding character should be correct
- *
- * \todo distant future:
- * - Later on, it should run through a Validator
- *   which will make sure all field 1, 1C are present and those only
- * - In a perfect world I should remove private tags and transform them into
- *   public fields.
- * - DA should be correct, PN should be correct (no space!)
- * - Enumerated Value should be correct
- */
-/*
- check-meta is ideal for image like:
-
-  gdcmconv -C gdcmData/PICKER-16-MONO2-No_DicomV3_Preamble.dcm bla.dcm
-*/
 #include "gdcmReader.h"
 #include "gdcmFileDerivation.h"
 #include "gdcmAnonymizer.h"
@@ -93,8 +28,8 @@
 #include <string>
 #include <iostream>
 
-#include <stdio.h>     /* for printf */
-#include <stdlib.h>    /* for exit */
+#include <stdio.h>
+#include <stdlib.h>
 #include <getopt.h>
 #include <string.h>
 
@@ -510,8 +445,15 @@ int change_transfersyntax(const std::string &filename, const std::string &outfil
 
 } // end anonymous namespace
 
-int main (int argc, char *argv[])
+extern "C" int c_main (int argc, char *argv[])
 {
+
+  for (int i = 0; i < argc; ++i)
+    {
+      std::cout << argv[i] << " ";
+    }
+  std::cout << std::endl;
+
   int c;
   //int digit_optind = 0;
 
