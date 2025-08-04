@@ -20,4 +20,6 @@ cp build/gdcm/bin/libgdcm*.a third_party/prebuilt/darwin_arm64/
 
 # Copy generated header files
 mkdir -p third_party/prebuilt/darwin_arm64/include
+
+find third_party/gdcm/Source -name "*.h" | xargs -I {} sh -c 'cp {} third_party/prebuilt/darwin_arm64/include/$(basename {})'
 find build/gdcm/Source/Common -name '*.h' | xargs -I {} sh -c 'cp {} third_party/prebuilt/darwin_arm64/include/$(basename {})'
