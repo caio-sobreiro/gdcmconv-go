@@ -11,7 +11,7 @@ package gdcm
 #cgo CXXFLAGS: -I${SRCDIR}/../../third_party/gdcm/Source/MediaStorageAndFileFormat
 #cgo CXXFLAGS: -I${SRCDIR}/../../third_party/gdcm/Source/MessageExchangeDefinition
 
-#cgo CXXFLAGS: -I${SRCDIR}/../../third_party/prebuilt/darwin_arm64/include
+#cgo CXXFLAGS: -I${SRCDIR}/../../third_party/prebuilt/include
 
 #cgo LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/darwin_arm64
 #cgo LDFLAGS: -lgdcmMSFF -lgdcmDICT -lgdcmCommon -lgdcmuuid
