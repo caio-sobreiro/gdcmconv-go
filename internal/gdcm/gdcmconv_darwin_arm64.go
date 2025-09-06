@@ -20,7 +20,34 @@ package gdcm
 
 #include <stdlib.h>
 
-extern int c_main(int argc, char *argv[]);
+// Compression types
+typedef enum {
+    COMPRESSION_RAW = 0,
+    COMPRESSION_JPEG_LOSSY,
+    COMPRESSION_JPEG_LOSSLESS,
+    COMPRESSION_JPEG2000_LOSSY,
+    COMPRESSION_JPEG2000_LOSSLESS,
+    COMPRESSION_JPEGLS_LOSSY,
+    COMPRESSION_JPEGLS_LOSSLESS,
+    COMPRESSION_RLE,
+    COMPRESSION_DEFLATED
+} compression_type_t;
+
+// Result structure
+typedef struct {
+    int success;
+    char error_message[256];
+} gdcm_result_t;
+
+// Function declarations
+extern gdcm_result_t gdcm_convert_image(const char* input_file, const char* output_file,
+                                       compression_type_t compression, double quality_or_rate);
+extern gdcm_result_t gdcm_convert_transfer_syntax(const char* input_file, const char* output_file,
+                                                 int explicit_ts, int implicit_ts);
+extern gdcm_result_t gdcm_apply_lut(const char* input_file, const char* output_file, int rgb8);
+extern gdcm_result_t gdcm_remove_tags(const char* input_file, const char* output_file,
+                                     int remove_private, int remove_retired, int remove_group_length);
+
 */
 import "C"
 import (
@@ -28,19 +55,172 @@ import (
 	"unsafe"
 )
 
+// CompressionType represents different compression algorithms
+type CompressionType int
+
+const (
+	CompressionRaw CompressionType = iota
+	CompressionJPEGLossy
+	CompressionJPEGLossless
+	CompressionJPEG2000Lossy
+	CompressionJPEG2000Lossless
+	CompressionJPEGLSLossy
+	CompressionJPEGLSLossless
+	CompressionRLE
+	CompressionDeflated
+)
+
+// ConvertOptions holds options for DICOM conversion
+type ConvertOptions struct {
+	Compression   CompressionType
+	QualityOrRate float64 // For lossy compression: quality (0-100) or rate for JPEG2000
+}
+
+// ConvertImage converts a DICOM image with the specified compression
+func ConvertImage(inputPath, outputPath string, opts ConvertOptions) error {
+	cInputPath := C.CString(inputPath)
+	defer C.free(unsafe.Pointer(cInputPath))
+
+	cOutputPath := C.CString(outputPath)
+	defer C.free(unsafe.Pointer(cOutputPath))
+
+	result := C.gdcm_convert_image(
+		cInputPath,
+		cOutputPath,
+		C.compression_type_t(opts.Compression),
+		C.double(opts.QualityOrRate),
+	)
+
+	if result.success == 0 {
+		return fmt.Errorf("conversion failed: %s", C.GoString(&result.error_message[0]))
+	}
+
+	return nil
+}
+
+// ConvertToJPEG2000 is a convenience function for JPEG2000 lossless conversion
 func ConvertToJPEG2000(inputPath string, outputPath string) error {
-	argv := []string{"gdcmconv", "--j2k", inputPath, outputPath}
-	argc := C.int(len(argv))
+	return ConvertImage(inputPath, outputPath, ConvertOptions{
+		Compression: CompressionJPEG2000Lossless,
+	})
+}
 
-	cArgv := make([]*C.char, len(argv))
-	for i, arg := range argv {
-		cArgv[i] = C.CString(arg)
-		defer C.free(unsafe.Pointer(cArgv[i]))
+// ConvertToJPEG2000Lossy converts to JPEG2000 with specified quality
+func ConvertToJPEG2000Lossy(inputPath string, outputPath string, quality float64) error {
+	return ConvertImage(inputPath, outputPath, ConvertOptions{
+		Compression:   CompressionJPEG2000Lossy,
+		QualityOrRate: quality,
+	})
+}
+
+// ConvertToJPEG converts to JPEG with specified quality
+func ConvertToJPEG(inputPath string, outputPath string, quality float64) error {
+	return ConvertImage(inputPath, outputPath, ConvertOptions{
+		Compression:   CompressionJPEGLossy,
+		QualityOrRate: quality,
+	})
+}
+
+// ConvertToRaw decompresses the image to raw format
+func ConvertToRaw(inputPath string, outputPath string) error {
+	return ConvertImage(inputPath, outputPath, ConvertOptions{
+		Compression: CompressionRaw,
+	})
+}
+
+// ConvertTransferSyntax changes the transfer syntax without compression
+func ConvertTransferSyntax(inputPath, outputPath string, explicitTS, implicitTS bool) error {
+	cInputPath := C.CString(inputPath)
+	defer C.free(unsafe.Pointer(cInputPath))
+
+	cOutputPath := C.CString(outputPath)
+	defer C.free(unsafe.Pointer(cOutputPath))
+
+	var explicitTSInt, implicitTSInt C.int
+	if explicitTS {
+		explicitTSInt = 1
+	}
+	if implicitTS {
+		implicitTSInt = 1
 	}
 
-	result := C.c_main(argc, (**C.char)(unsafe.Pointer(&cArgv[0])))
-	if result != 0 {
-		return fmt.Errorf("failed to convert DICOM file to JPEG2000")
+	result := C.gdcm_convert_transfer_syntax(
+		cInputPath,
+		cOutputPath,
+		explicitTSInt,
+		implicitTSInt,
+	)
+
+	if result.success == 0 {
+		return fmt.Errorf("transfer syntax conversion failed: %s", C.GoString(&result.error_message[0]))
 	}
+
+	return nil
+}
+
+// ApplyLUT applies lookup table transformation
+func ApplyLUT(inputPath, outputPath string, rgb8 bool) error {
+	cInputPath := C.CString(inputPath)
+	defer C.free(unsafe.Pointer(cInputPath))
+
+	cOutputPath := C.CString(outputPath)
+	defer C.free(unsafe.Pointer(cOutputPath))
+
+	var rgb8Int C.int
+	if rgb8 {
+		rgb8Int = 1
+	}
+
+	result := C.gdcm_apply_lut(
+		cInputPath,
+		cOutputPath,
+		rgb8Int,
+	)
+
+	if result.success == 0 {
+		return fmt.Errorf("LUT application failed: %s", C.GoString(&result.error_message[0]))
+	}
+
+	return nil
+}
+
+// RemoveTagsOptions holds options for tag removal
+type RemoveTagsOptions struct {
+	RemovePrivate     bool
+	RemoveRetired     bool
+	RemoveGroupLength bool
+}
+
+// RemoveTags removes specified types of tags from DICOM file
+func RemoveTags(inputPath, outputPath string, opts RemoveTagsOptions) error {
+	cInputPath := C.CString(inputPath)
+	defer C.free(unsafe.Pointer(cInputPath))
+
+	cOutputPath := C.CString(outputPath)
+	defer C.free(unsafe.Pointer(cOutputPath))
+
+	var removePrivateInt, removeRetiredInt, removeGroupLengthInt C.int
+	if opts.RemovePrivate {
+		removePrivateInt = 1
+	}
+	if opts.RemoveRetired {
+		removeRetiredInt = 1
+	}
+	if opts.RemoveGroupLength {
+		removeGroupLengthInt = 1
+	}
+
+	result := C.gdcm_remove_tags(
+		cInputPath,
+		cOutputPath,
+		removePrivateInt,
+		removeRetiredInt,
+		removeGroupLengthInt,
+	)
+
+	if result.success == 0 {
+		return fmt.Errorf("tag removal failed: %s", C.GoString(&result.error_message[0]))
+	}
+
 	return nil
 }

@@ -33,6 +33,39 @@
 #include <getopt.h>
 #include <string.h>
 
+// C interface for Go
+extern "C" {
+
+// Compression types
+typedef enum {
+    COMPRESSION_RAW = 0,
+    COMPRESSION_JPEG_LOSSY,
+    COMPRESSION_JPEG_LOSSLESS,
+    COMPRESSION_JPEG2000_LOSSY,
+    COMPRESSION_JPEG2000_LOSSLESS,
+    COMPRESSION_JPEGLS_LOSSY,
+    COMPRESSION_JPEGLS_LOSSLESS,
+    COMPRESSION_RLE,
+    COMPRESSION_DEFLATED
+} compression_type_t;
+
+// Result structure
+typedef struct {
+    int success;
+    char error_message[256];
+} gdcm_result_t;
+
+// Function declarations
+gdcm_result_t gdcm_convert_image(const char* input_file, const char* output_file,
+                                compression_type_t compression, double quality_or_rate);
+gdcm_result_t gdcm_convert_transfer_syntax(const char* input_file, const char* output_file,
+                                         int explicit_ts, int implicit_ts);
+gdcm_result_t gdcm_apply_lut(const char* input_file, const char* output_file, int rgb8);
+gdcm_result_t gdcm_remove_tags(const char* input_file, const char* output_file,
+                              int remove_private, int remove_retired, int remove_group_length);
+
+}
+
 struct SetSQToUndefined
 {
   void operator() (gdcm::DataElement &de) {
@@ -445,1029 +478,220 @@ int change_transfersyntax(const std::string &filename, const std::string &outfil
 
 } // end anonymous namespace
 
-extern "C" int c_main (int argc, char *argv[])
-{
+// Helper function to create error result
+static gdcm_result_t create_error_result(const char* message) {
+    gdcm_result_t result;
+    result.success = 0;
+    strncpy(result.error_message, message, sizeof(result.error_message) - 1);
+    result.error_message[sizeof(result.error_message) - 1] = '\0';
+    return result;
+}
 
-  for (int i = 0; i < argc; ++i)
-    {
-      std::cout << argv[i] << " ";
-    }
-  std::cout << std::endl;
+// Helper function to create success result
+static gdcm_result_t create_success_result() {
+    gdcm_result_t result;
+    result.success = 1;
+    result.error_message[0] = '\0';
+    return result;
+}
 
-  int c;
-  //int digit_optind = 0;
+extern "C" gdcm_result_t gdcm_convert_image(const char* input_file, const char* output_file,
+                                           compression_type_t compression, double quality_or_rate) {
+    try {
+        gdcm::PixmapReader reader;
+        reader.SetFileName(input_file);
+        if (!reader.Read()) {
+            return create_error_result("Could not read input file");
+        }
 
-  std::string filename;
-  std::string outfilename;
-  std::string root;
-  int explicitts = 0; // explicit is a reserved keyword
-  int implicit = 0;
-  int quiet = 0;
-  int lut = 0;
-  int lut8 = 0;
-  int decompress_lut = 0;
-  int raw = 0;
-  int deflated = 0;
-  int rootuid = 0;
-  int checkmeta = 0;
-  int jpeg = 0;
-  int jpegls = 0;
-  int j2k = 0;
-  int lossy = 0;
-  int split = 0;
-  int fragmentsize = 0;
-  int rle = 0;
-  int force = 0;
-  int planarconf = 0;
-  int planarconfval = 0;
-  double iconmin = 0;
-  double iconmax = 0;
-  int usedict = 0;
-  int compressicon = 0;
-  int generateicon = 0;
-  int iconminmax = 0;
-  int iconautominmax = 0;
-  int removegrouplength = 0;
-  int removeprivate = 0;
-  int removeretired = 0;
-  int photometricinterpretation = 0;
-  std::string photometricinterpretation_str;
-  int quality = 0;
-  int rate = 0;
-  int tile = 0;
-  int nres = 0;
-  int nresvalue = 6; // ??
-  std::vector<float> qualities;
-  std::vector<float> rates;
-  std::vector<unsigned int> tilesize;
-  int irreversible = 0;
-  int changeprivatetags = 0;
+        gdcm::Pixmap &image = reader.GetPixmap();
+        gdcm::ImageChangeTransferSyntax change;
+        change.SetForce(false);
+        change.SetCompressIconImage(false);
 
-  int verbose = 0;
-  int warning = 0;
-  int debug = 0;
-  int error = 0;
-  int help = 0;
-  int version = 0;
-  int ignoreerrors = 0;
-  int jpeglserror = 0;
-  int jpeglserror_value = 0;
+        // Not really the right info, but we're trying to create an output file identical to the gdcmconv command
+        // so that we can compare output file hashes for sanity checks.
+        gdcm::FileMetaInformation::SetImplementationClassUID("1.2.826.0.1.3680043.2.1143.107.104.103.115.3.0.24");
+        gdcm::FileMetaInformation::SetImplementationVersionName("GDCM 3.0.24");
+        gdcm::FileMetaInformation::SetSourceApplicationEntityTitle("gdcmconv");
 
-  while (true) {
-    //int this_option_optind = optind ? optind : 1;
-    int option_index = 0;
-    static struct option long_options[] = {
-        {"input", 1, nullptr, 0},
-        {"output", 1, nullptr, 0},
-        {"group-length", 1, nullptr, 0}, // valid / create / remove
-        {"preamble", 1, nullptr, 0}, // valid / create / remove
-        {"padding", 1, nullptr, 0}, // valid (\0 -> space) / optimize (at most 1 byte of padding)
-        {"vr", 1, nullptr, 0}, // valid
-        {"sop", 1, nullptr, 0}, // default to SC...
-        {"iod", 1, nullptr, 0}, // valid
-        {"meta", 1, nullptr, 0}, // valid / create / remove
-        {"dataset", 1, nullptr, 0}, // valid / create / remove?
-        {"sequence", 1, nullptr, 0}, // defined / undefined
-        {"deflate", 1, nullptr, 0}, // 1 - 9 / best = 9 / fast = 1
-        {"tag", 1, nullptr, 0}, // need to specify a tag xxxx,yyyy = value to override default
-        {"name", 1, nullptr, 0}, // same as tag but explicit use of name
-        {"root-uid", 1, &rootuid, 1}, // specific Root (not GDCM)
-        {"check-meta", 0, &checkmeta, 1}, // specific Root (not GDCM)
-// Image specific options:
-        {"pixeldata", 1, nullptr, 0}, // valid
-        {"apply-lut", 0, &lut, 1}, // default (implicit VR, LE) / Explicit LE / Explicit BE
-        {"raw", 0, &raw, 1}, // default (implicit VR, LE) / Explicit LE / Explicit BE
-        {"deflated", 0, &deflated, 1}, // DeflatedExplicitVRLittleEndian
-        {"lossy", 0, &lossy, 1}, // Specify lossy comp
-        {"force", 0, &force, 1}, // force decompression even if target compression is identical
-        {"jpeg", 0, &jpeg, 1}, // JPEG lossy / lossless
-        {"jpegls", 0, &jpegls, 1}, // JPEG-LS: lossy / lossless
-        {"j2k", 0, &j2k, 1}, // J2K: lossy / lossless
-        {"rle", 0, &rle, 1}, // lossless !
-        {"mpeg2", 0, nullptr, 0}, // lossy !
-        {"jpip", 0, nullptr, 0}, // ??
-        {"split", 1, &split, 1}, // split fragments
-        {"planar-configuration", 1, &planarconf, 1}, // Planar Configuration
-        {"explicit", 0, &explicitts, 1}, //
-        {"implicit", 0, &implicit, 1}, //
-        {"use-dict", 0, &usedict, 1}, //
-        {"generate-icon", 0, &generateicon, 1}, //
-        {"icon-minmax", 1, &iconminmax, 1}, //
-        {"icon-auto-minmax", 0, &iconautominmax, 1}, //
-        {"compress-icon", 0, &compressicon, 1}, //
-        {"remove-gl", 0, &removegrouplength, 1}, //
-        {"remove-private-tags", 0, &removeprivate, 1}, //
-        {"remove-retired", 0, &removeretired, 1}, //
-        {"photometric-interpretation", 1, &photometricinterpretation, 1}, //
-        {"with-private-dict", 0, &changeprivatetags, 1}, //
-        {"decompress-lut", 0, &decompress_lut, 1}, // linearized segmented LUT
-        {"apply-lut8", 0, &lut8, 1},
-// j2k :
-        {"rate", 1, &rate, 1}, //
-        {"quality", 1, &quality, 1}, // will also work for regular jpeg compressor
-        {"tile", 1, &tile, 1}, //
-        {"number-resolution", 1, &nres, 1}, //
-        {"irreversible", 0, &irreversible, 1}, //
-        {"allowed-error", 1, &jpeglserror, 1}, //
-
-// General options !
-        {"verbose", 0, &verbose, 1},
-        {"warning", 0, &warning, 1},
-        {"debug", 0, &debug, 1},
-        {"error", 0, &error, 1},
-        {"help", 0, &help, 1},
-        {"version", 0, &version, 1},
-        {"ignore-errors", 0, &ignoreerrors, 1},
-        {"quiet", 0, &quiet, 1},
-
-        {nullptr, 0, nullptr, 0}
-    };
-
-    c = getopt_long (argc, argv, "i:o:XMUCl8wdJKLRFYS:P:VWDEhvIr:q:t:n:e:",
-      long_options, &option_index);
-    if (c == -1)
-      {
-      break;
-      }
-
-    switch (c)
-      {
-    case 0:
-        {
-        const char *s = long_options[option_index].name; (void)s;
-        //printf ("option %s", s);
-        if (optarg)
-          {
-          if( option_index == 0 ) /* input */
-            {
-            gdcm_assert( strcmp(s, "input") == 0 );
-            gdcm_assert( filename.empty() );
-            filename = optarg;
+        // Configure compression based on type
+        switch (compression) {
+            case COMPRESSION_RAW: {
+                const gdcm::TransferSyntax &ts = image.GetTransferSyntax();
+                if (ts.IsExplicit()) {
+                    change.SetTransferSyntax(gdcm::TransferSyntax::ExplicitVRLittleEndian);
+                } else {
+                    change.SetTransferSyntax(gdcm::TransferSyntax::ImplicitVRLittleEndian);
+                }
+                break;
             }
-          else if( option_index == 14 ) /* root-uid */
-            {
-            gdcm_assert( strcmp(s, "root-uid") == 0 );
-            gdcm_assert( root.empty() );
-            root = optarg;
+            case COMPRESSION_JPEG_LOSSY: {
+                const gdcm::PixelFormat &pf = image.GetPixelFormat();
+                gdcm::JPEGCodec jpegcodec;
+                jpegcodec.SetLossless(false);
+                if (quality_or_rate > 0) {
+                    jpegcodec.SetQuality(quality_or_rate);
+                }
+                if (pf.GetBitsAllocated() > 8) {
+                    change.SetTransferSyntax(gdcm::TransferSyntax::JPEGExtendedProcess2_4);
+                } else {
+                    change.SetTransferSyntax(gdcm::TransferSyntax::JPEGBaselineProcess1);
+                }
+                change.SetUserCodec(&jpegcodec);
+                break;
             }
-          else if( option_index == 28 ) /* split */
-            {
-            gdcm_assert( strcmp(s, "split") == 0 );
-            fragmentsize = atoi(optarg);
+            case COMPRESSION_JPEG_LOSSLESS:
+                change.SetTransferSyntax(gdcm::TransferSyntax::JPEGLosslessProcess14_1);
+                break;
+            case COMPRESSION_JPEG2000_LOSSY: {
+                gdcm::JPEG2000Codec j2kcodec;
+                if (quality_or_rate > 0) {
+                    j2kcodec.SetQuality(0, quality_or_rate);
+                }
+                j2kcodec.SetReversible(false);
+                change.SetTransferSyntax(gdcm::TransferSyntax::JPEG2000);
+                change.SetUserCodec(&j2kcodec);
+                break;
             }
-          else if( option_index == 29 ) /* planar conf*/
-            {
-            gdcm_assert( strcmp(s, "planar-configuration") == 0 );
-            planarconfval = atoi(optarg);
+            case COMPRESSION_JPEG2000_LOSSLESS:
+                change.SetTransferSyntax(gdcm::TransferSyntax::JPEG2000Lossless);
+                break;
+            case COMPRESSION_JPEGLS_LOSSY: {
+                gdcm::JPEGLSCodec jpeglscodec;
+                jpeglscodec.SetLossless(false);
+                if (quality_or_rate > 0) {
+                    jpeglscodec.SetLossyError(static_cast<int>(quality_or_rate));
+                }
+                change.SetTransferSyntax(gdcm::TransferSyntax::JPEGLSNearLossless);
+                change.SetUserCodec(&jpeglscodec);
+                break;
             }
-          else if( option_index == 34 ) /* icon minmax*/
-            {
-            gdcm_assert( strcmp(s, "icon-minmax") == 0 );
-            std::stringstream ss;
-            ss.str( optarg );
-            ss >> iconmin;
-            char comma;
-            ss >> comma;
-            ss >> iconmax;
-            }
-          else if( option_index == 40 ) /* photometricinterpretation */
-            {
-            gdcm_assert( strcmp(s, "photometric-interpretation") == 0 );
-            photometricinterpretation_str = optarg;
-            }
-          else if( option_index == 42 ) /* rate */
-            {
-            gdcm_assert( strcmp(s, "rate") == 0 );
-            readvector(rates, optarg);
-            }
-          else if( option_index == 43 ) /* quality */
-            {
-            gdcm_assert( strcmp(s, "quality") == 0 );
-            readvector(qualities, optarg);
-            }
-          else if( option_index == 44 ) /* tile */
-            {
-            gdcm_assert( strcmp(s, "tile") == 0 );
-            size_t n = readvector(tilesize, optarg);
-            gdcm_assert( n == 2 ); (void)n;
-            }
-          else if( option_index == 45 ) /* number of resolution */
-            {
-            gdcm_assert( strcmp(s, "number-resolution") == 0 );
-            nresvalue = atoi(optarg);
-            }
-          else if( option_index == 47 ) /* JPEG-LS error */
-            {
-            gdcm_assert( strcmp(s, "allowed-error") == 0 );
-            jpeglserror_value = atoi(optarg);
-            }
-          //printf (" with arg %s, index = %d", optarg, option_index);
-          }
-        //printf ("\n");
+            case COMPRESSION_JPEGLS_LOSSLESS:
+                change.SetTransferSyntax(gdcm::TransferSyntax::JPEGLSLossless);
+                break;
+            case COMPRESSION_RLE:
+                change.SetTransferSyntax(gdcm::TransferSyntax::RLELossless);
+                break;
+            case COMPRESSION_DEFLATED:
+                change.SetTransferSyntax(gdcm::TransferSyntax::DeflatedExplicitVRLittleEndian);
+                break;
+            default:
+                return create_error_result("Unsupported compression type");
         }
-      break;
 
-    case 'i':
-      //printf ("option i with value '%s'\n", optarg);
-      gdcm_assert( filename.empty() );
-      filename = optarg;
-      break;
+        change.SetInput(image);
+        if (!change.Change()) {
+            return create_error_result("Could not change transfer syntax");
+        }
 
-    case 'o':
-      //printf ("option o with value '%s'\n", optarg);
-      gdcm_assert( outfilename.empty() );
-      outfilename = optarg;
-      break;
+        gdcm::PixmapWriter writer;
+        writer.SetFileName(output_file);
+        writer.SetFile(reader.GetFile());
+        writer.SetPixmap(change.PixmapToPixmapFilter::GetOutput());
 
-    case 'X':
-      explicitts = 1;
-      break;
+        if (!writer.Write()) {
+            return create_error_result("Failed to write output file");
+        }
 
-    case 'M':
-      implicit = 1;
-      break;
-
-    case 'U':
-      usedict = 1;
-      break;
-
-    case 'C':
-      checkmeta = 1;
-      break;
-
-    // root-uid
-
-    case 'l':
-      lut = 1;
-      break;
-
-    case '8':
-      lut8 = 1;
-      break;
-
-
-    case 'w':
-      raw = 1;
-      break;
-
-    case 'e':
-      jpeglserror = 1;
-      jpeglserror_value = atoi(optarg);
-      break;
-
-    case 'd':
-      deflated = 1;
-      break;
-
-    case 'J':
-      jpeg = 1;
-      break;
-
-    case 'K':
-      j2k = 1;
-      break;
-
-    case 'L':
-      jpegls = 1;
-      break;
-
-    case 'R':
-      rle = 1;
-      break;
-
-    case 'F':
-      force = 1;
-      break;
-
-    case 'Y':
-      lossy = 1;
-      break;
-
-    case 'S':
-      split = 1;
-      fragmentsize = atoi(optarg);
-      break;
-
-    case 'P':
-      photometricinterpretation = 1;
-      photometricinterpretation_str = optarg;
-      break;
-
-    case 'r':
-      rate = 1;
-      readvector(rates, optarg);
-      break;
-
-    case 'q':
-      quality = 1;
-      readvector(qualities, optarg);
-      break;
-
-    case 't':
-      tile = 1;
-      readvector(tilesize, optarg);
-      break;
-
-    case 'n':
-      nres = 1;
-      nresvalue = atoi(optarg);
-      break;
-
-    // General option
-    case 'V':
-      verbose = 1;
-      break;
-
-    case 'W':
-      warning = 1;
-      break;
-
-    case 'D':
-      debug = 1;
-      break;
-
-    case 'E':
-      error = 1;
-      break;
-
-    case 'h':
-      help = 1;
-      break;
-
-    case 'v':
-      version = 1;
-      break;
-
-    case 'I':
-      ignoreerrors = 1;
-      break;
-
-    case '?':
-      break;
-
-    default:
-      printf ("?? getopt returned character code 0%o ??\n", c);
-      }
-  }
-
-  // For now only support one input / one output
-  if (optind < argc)
-    {
-    //printf ("non-option ARGV-elements: ");
-    std::vector<std::string> files;
-    while (optind < argc)
-      {
-      //printf ("%s\n", argv[optind++]);
-      files.emplace_back(argv[optind++] );
-      }
-    //printf ("\n");
-    if( files.size() == 2
-      && filename.empty()
-      && outfilename.empty()
-    )
-      {
-      filename = files[0];
-      outfilename = files[1];
-      }
-    else
-      {
-      PrintHelp();
-      return 1;
-      }
+        return create_success_result();
+    } catch (const std::exception& e) {
+        return create_error_result(e.what());
+    } catch (...) {
+        return create_error_result("Unknown error occurred");
     }
+}
 
-  if( version )
-    {
-    //std::cout << "version" << std::endl;
-    PrintVersion();
-    return 0;
+extern "C" gdcm_result_t gdcm_convert_transfer_syntax(const char* input_file, const char* output_file,
+                                                     int explicit_ts, int implicit_ts) {
+    try {
+        return change_transfersyntax(std::string(input_file), std::string(output_file),
+                                   explicit_ts, implicit_ts, 0, 0, 0) == 0
+               ? create_success_result()
+               : create_error_result("Failed to change transfer syntax");
+    } catch (const std::exception& e) {
+        return create_error_result(e.what());
+    } catch (...) {
+        return create_error_result("Unknown error occurred");
     }
+}
 
-  if( help )
-    {
-    //std::cout << "help" << std::endl;
-    PrintHelp();
-    return 0;
+extern "C" gdcm_result_t gdcm_apply_lut(const char* input_file, const char* output_file, int rgb8) {
+    try {
+        gdcm::PixmapReader reader;
+        reader.SetFileName(input_file);
+        if (!reader.Read()) {
+            return create_error_result("Could not read input file");
+        }
+
+        const gdcm::Pixmap &image = reader.GetPixmap();
+        gdcm::ImageApplyLookupTable lutfilt;
+        lutfilt.SetInput(image);
+        lutfilt.SetRGB8(rgb8 != 0);
+
+        if (!lutfilt.Apply()) {
+            return create_error_result("Could not apply LUT");
+        }
+
+        gdcm::PixmapWriter writer;
+        writer.SetFileName(output_file);
+        writer.SetFile(reader.GetFile());
+        writer.SetPixmap(lutfilt.PixmapToPixmapFilter::GetOutput());
+
+        if (!writer.Write()) {
+            return create_error_result("Failed to write output file");
+        }
+
+        return create_success_result();
+    } catch (const std::exception& e) {
+        return create_error_result(e.what());
+    } catch (...) {
+        return create_error_result("Unknown error occurred");
     }
+}
 
-  if( filename.empty() )
-    {
-    //std::cerr << "Need input file (-i)\n";
-    PrintHelp();
-    return 1;
+extern "C" gdcm_result_t gdcm_remove_tags(const char* input_file, const char* output_file,
+                                         int remove_private, int remove_retired, int remove_group_length) {
+    try {
+        gdcm::Reader reader;
+        reader.SetFileName(input_file);
+        if (!reader.Read()) {
+            return create_error_result("Could not read input file");
+        }
+
+        gdcm::MediaStorage ms;
+        ms.SetFromFile(reader.GetFile());
+        if (ms == gdcm::MediaStorage::MediaStorageDirectoryStorage) {
+            return create_error_result("DICOMDIR is not supported");
+        }
+
+        gdcm::Anonymizer ano;
+        ano.SetFile(reader.GetFile());
+
+        if (remove_group_length && !ano.RemoveGroupLength()) {
+            return create_error_result("Could not remove group length");
+        }
+
+        if (remove_retired && !ano.RemoveRetired()) {
+            return create_error_result("Could not remove retired tags");
+        }
+
+        if (remove_private && !ano.RemovePrivateTags()) {
+            return create_error_result("Could not remove private tags");
+        }
+
+        gdcm::Writer writer;
+        writer.SetFileName(output_file);
+        writer.SetFile(ano.GetFile());
+
+        if (!writer.Write()) {
+            return create_error_result("Failed to write output file");
+        }
+
+        return create_success_result();
+    } catch (const std::exception& e) {
+        return create_error_result(e.what());
+    } catch (...) {
+        return create_error_result("Unknown error occurred");
     }
-  if( outfilename.empty() )
-    {
-    //std::cerr << "Need output file (-o)\n";
-    PrintHelp();
-    return 1;
-    }
-
-  // Debug is a little too verbose
-  gdcm::Trace::SetDebug( (debug  > 0 ? true : false));
-  gdcm::Trace::SetWarning(  (warning  > 0 ? true : false));
-  gdcm::Trace::SetError(  (error  > 0 ? true : false));
-  // when verbose is true, make sure warning+error are turned on:
-  if( verbose )
-    {
-    gdcm::Trace::SetWarning( (verbose  > 0 ? true : false) );
-    gdcm::Trace::SetError( (verbose  > 0 ? true : false) );
-    }
-
-  gdcm::FileMetaInformation::SetSourceApplicationEntityTitle( "gdcmconv" );
-  if( !rootuid )
-    {
-    // only read the env var is no explicit cmd line option
-    // maybe there is an env var defined... let's check
-    const char *rootuid_env = getenv("GDCM_ROOT_UID");
-    if( rootuid_env )
-      {
-      rootuid = 1;
-      root = rootuid_env;
-      }
-    }
-  if( rootuid )
-    {
-    // root is set either by the cmd line option or the env var
-    if( !gdcm::UIDGenerator::IsValid( root.c_str() ) )
-      {
-      std::cerr << "specified Root UID is not valid: " << root << std::endl;
-      return 1;
-      }
-    gdcm::UIDGenerator::SetRoot( root.c_str() );
-    }
-
-  if( removegrouplength || removeprivate || removeretired )
-    {
-    gdcm::Reader reader;
-    reader.SetFileName( filename.c_str() );
-    if( !reader.Read() )
-      {
-      std::cerr << "Could not read: " << filename << std::endl;
-      return 1;
-      }
-    gdcm::MediaStorage ms;
-    ms.SetFromFile( reader.GetFile() );
-    if( ms == gdcm::MediaStorage::MediaStorageDirectoryStorage )
-      {
-      std::cerr << "Sorry DICOMDIR is not supported" << std::endl;
-      return 1;
-      }
-
-    gdcm::Anonymizer ano;
-    ano.SetFile( reader.GetFile() );
-    if( removegrouplength )
-      {
-      if( !ano.RemoveGroupLength() )
-        {
-        std::cerr << "Could not remove group length" << std::endl;
-        }
-      }
-    if( removeretired )
-      {
-      if( !ano.RemoveRetired() )
-        {
-        std::cerr << "Could not remove retired tags" << std::endl;
-        }
-      }
-    if( removeprivate )
-      {
-      if( !ano.RemovePrivateTags() )
-        {
-        std::cerr << "Could not remove private tags" << std::endl;
-        }
-      }
-
-    gdcm::Writer writer;
-    writer.SetFileName( outfilename.c_str() );
-    writer.SetFile( ano.GetFile() );
-    if( !writer.Write() )
-      {
-      std::cerr << "Failed to write: " << outfilename << std::endl;
-      return 1;
-      }
-
-    return 0;
-    }
-
-  // Handle here the general file (not required to be image)
-  if ( !raw && (explicitts || implicit || deflated) )
-    {
-    return change_transfersyntax(filename, outfilename, raw, explicitts, implicit, deflated, changeprivatetags);
-    }
-
-  // split fragments
-  if( split )
-    {
-    gdcm::PixmapReader reader;
-    reader.SetFileName( filename.c_str() );
-    if( !reader.Read() )
-      {
-      std::cerr << "Could not read (pixmap): " << filename << std::endl;
-      return 1;
-      }
-    const gdcm::Pixmap &image = reader.GetPixmap();
-
-    gdcm::ImageFragmentSplitter splitter;
-    splitter.SetInput( image );
-    splitter.SetFragmentSizeMax( fragmentsize );
-    splitter.SetForce( (force > 0 ? true: false));
-    bool b = splitter.Split();
-    if( !b )
-      {
-      std::cerr << "Could not split: " << filename << std::endl;
-      return 1;
-      }
-    gdcm::PixmapWriter writer;
-    writer.SetFileName( outfilename.c_str() );
-    writer.SetFile( reader.GetFile() );
-    writer.SetPixmap( splitter.PixmapToPixmapFilter::GetOutput() );
-    if( !writer.Write() )
-      {
-      std::cerr << "Failed to write: " << outfilename << std::endl;
-      return 1;
-      }
-    }
-  else if( photometricinterpretation )
-    {
-    gdcm::PixmapReader reader;
-    reader.SetFileName( filename.c_str() );
-    if( !reader.Read() )
-      {
-      std::cerr << "Could not read (pixmap): " << filename << std::endl;
-      return 1;
-      }
-    const gdcm::Pixmap &image = reader.GetPixmap();
-
-    // Just in case:
-    if( gdcm::PhotometricInterpretation::GetPIType(photometricinterpretation_str.c_str())
-      == gdcm::PhotometricInterpretation::PI_END )
-      {
-      std::cerr << "Do not handle PhotometricInterpretation: " << photometricinterpretation_str << std::endl;
-      return 1;
-      }
-    gdcm::PhotometricInterpretation pi (
-      gdcm::PhotometricInterpretation::GetPIType(photometricinterpretation_str.c_str()) );
-    gdcm::ImageChangePhotometricInterpretation pifilt;
-    pifilt.SetInput( image );
-    pifilt.SetPhotometricInterpretation( pi );
-    bool b = pifilt.Change();
-    if( !b )
-      {
-      std::cerr << "Could not apply PhotometricInterpretation: " << filename << std::endl;
-      return 1;
-      }
-    gdcm::PixmapWriter writer;
-    writer.SetFileName( outfilename.c_str() );
-    writer.SetFile( reader.GetFile() );
-    writer.SetPixmap( pifilt.PixmapToPixmapFilter::GetOutput() );
-    if( !writer.Write() )
-      {
-      std::cerr << "Failed to write: " << outfilename << std::endl;
-      return 1;
-      }
-    }
-  else if( decompress_lut )
-  {
-    gdcm::PixmapReader reader;
-    reader.SetFileName( filename.c_str() );
-    if( !reader.Read() )
-      {
-      std::cerr << "Could not read (pixmap): " << filename << std::endl;
-      return 1;
-      }
-    const gdcm::Pixmap &image = reader.GetPixmap();
-
-    gdcm::FileDecompressLookupTable lutfilt;
-    lutfilt.SetFile( reader.GetFile() );
-    lutfilt.SetPixmap( image );
-    bool b = lutfilt.Change();
-    if( !b )
-      {
-      std::cerr << "Could not decompress LUT: " << filename << std::endl;
-      return 1;
-      }
-    gdcm::PixmapWriter writer;
-    writer.SetFileName( outfilename.c_str() );
-    writer.SetFile( reader.GetFile() );
-    writer.SetPixmap( lutfilt.GetPixmap() );
-    if( !writer.Write() )
-      {
-      std::cerr << "Failed to write: " << outfilename << std::endl;
-      return 1;
-      }
-  }
-  else if( lut || lut8 )
-    {
-    gdcm::PixmapReader reader;
-    reader.SetFileName( filename.c_str() );
-    if( !reader.Read() )
-      {
-      std::cerr << "Could not read (pixmap): " << filename << std::endl;
-      return 1;
-      }
-    const gdcm::Pixmap &image = reader.GetPixmap();
-
-    gdcm::ImageApplyLookupTable lutfilt;
-    lutfilt.SetInput( image );
-    lutfilt.SetRGB8( lut8 != 0 );
-    bool b = lutfilt.Apply();
-    if( !b )
-      {
-      std::cerr << "Could not apply LUT: " << filename << std::endl;
-      return 1;
-      }
-    gdcm::PixmapWriter writer;
-    writer.SetFileName( outfilename.c_str() );
-    writer.SetFile( reader.GetFile() );
-    writer.SetPixmap( lutfilt.PixmapToPixmapFilter::GetOutput() );
-    if( !writer.Write() )
-      {
-      std::cerr << "Failed to write: " << outfilename << std::endl;
-      return 1;
-      }
-    }
-  else if( jpeg || j2k || jpegls || rle || raw || force /*|| deflated*/ /*|| planarconf*/ )
-    {
-    gdcm::PixmapReader reader;
-    reader.SetFileName( filename.c_str() );
-    if( !reader.Read() )
-      {
-      gdcm::MediaStorage ms;
-      ms.SetFromFile( reader.GetFile() );
-      // handle bulk decompression '--raw' on a set of file, which may contains a PDF
-      if( raw && ms == gdcm::MediaStorage::EncapsulatedPDFStorage )
-        return change_transfersyntax(filename, outfilename, raw, explicitts, implicit, deflated, changeprivatetags);
-      // else
-      std::cerr << "Could not read (pixmap): " << filename << std::endl;
-      return 1;
-      }
-    gdcm::Pixmap &image = reader.GetPixmap();
-    //const gdcm::IconImage &icon = image.GetIconImage();
-    //if( !icon.IsEmpty() )
-    //  {
-    //  std::cerr << "Icons are not supported" << std::endl;
-    //  return 1;
-    //  }
-    if( generateicon )
-      {
-      gdcm::IconImageGenerator iig;
-      iig.SetPixmap( image );
-      const unsigned int idims[2] = { 64, 64 };
-      iig.SetOutputDimensions( idims );
-      if( iconminmax )
-        {
-        iig.SetPixelMinMax( iconmin, iconmax );
-        }
-      iig.AutoPixelMinMax( iconautominmax ? true : false );
-      bool b = iig.Generate();
-      if( !b ) return 1;
-      const gdcm::IconImage &icon = iig.GetIconImage();
-      image.SetIconImage( icon );
-      }
-
-    gdcm::JPEG2000Codec j2kcodec;
-    gdcm::JPEGCodec jpegcodec;
-    gdcm::JPEGLSCodec jpeglscodec;
-    gdcm::ImageChangeTransferSyntax change;
-    change.SetForce( (force > 0 ? true: false));
-    change.SetCompressIconImage( (compressicon > 0 ? true: false));
-    if( jpeg )
-      {
-      if( lossy )
-        {
-        const gdcm::PixelFormat &pf = image.GetPixelFormat();
-        if( pf.GetBitsAllocated() > 8 )
-          change.SetTransferSyntax(gdcm::TransferSyntax::JPEGExtendedProcess2_4);
-        else
-          change.SetTransferSyntax( gdcm::TransferSyntax::JPEGBaselineProcess1 );
-        jpegcodec.SetLossless( false );
-        if( quality )
-          {
-          gdcm_assert( qualities.size() == 1 );
-          jpegcodec.SetQuality( static_cast<double>(qualities[0]) );
-          }
-        change.SetUserCodec( &jpegcodec );
-        }
-      else
-        {
-        change.SetTransferSyntax( gdcm::TransferSyntax::JPEGLosslessProcess14_1 );
-        }
-      }
-    else if( jpegls )
-      {
-      if( lossy )
-        {
-        change.SetTransferSyntax( gdcm::TransferSyntax::JPEGLSNearLossless );
-        jpeglscodec.SetLossless( false );
-        if( jpeglserror )
-          {
-          jpeglscodec.SetLossyError( jpeglserror_value );
-          }
-        change.SetUserCodec( &jpeglscodec );
-        }
-      else
-        {
-        change.SetTransferSyntax( gdcm::TransferSyntax::JPEGLSLossless );
-        }
-      }
-    else if( j2k )
-      {
-      if( lossy )
-        {
-        change.SetTransferSyntax( gdcm::TransferSyntax::JPEG2000 );
-        if( rate )
-          {
-          int i = 0;
-          for(std::vector<float>::const_iterator it = rates.begin(); it != rates.end(); ++it )
-            {
-            j2kcodec.SetRate(i++, static_cast<double>(*it) );
-            }
-          }
-        if( quality )
-          {
-          int i = 0;
-          for(std::vector<float>::const_iterator it = qualities.begin(); it != qualities.end(); ++it )
-            {
-            j2kcodec.SetQuality( i++, static_cast<double>(*it) );
-            }
-          }
-        if( tile )
-          {
-          j2kcodec.SetTileSize( tilesize[0], tilesize[1] );
-          }
-        if( nres )
-          {
-          j2kcodec.SetNumberOfResolutions( nresvalue );
-          }
-        j2kcodec.SetReversible( !irreversible );
-        change.SetUserCodec( &j2kcodec );
-        }
-      else
-        {
-        change.SetTransferSyntax( gdcm::TransferSyntax::JPEG2000Lossless );
-        }
-      }
-    else if( raw )
-      {
-      if( lossy )
-        {
-        std::cerr << "no such thing as raw & lossy" << std::endl;
-        return 1;
-        }
-      const gdcm::TransferSyntax &ts = image.GetTransferSyntax();
-#ifdef GDCM_WORDS_BIGENDIAN
-      (void)ts;
-      change.SetTransferSyntax( gdcm::TransferSyntax::ExplicitVRBigEndian );
-#else
-      if( ts.IsExplicit() )
-        {
-        change.SetTransferSyntax( gdcm::TransferSyntax::ExplicitVRLittleEndian );
-        if( implicit )
-          change.SetTransferSyntax( gdcm::TransferSyntax::ImplicitVRLittleEndian );
-        }
-      else
-        {
-        gdcm_assert( ts.IsImplicit() );
-        change.SetTransferSyntax( gdcm::TransferSyntax::ImplicitVRLittleEndian );
-        if( explicitts )
-        change.SetTransferSyntax( gdcm::TransferSyntax::ExplicitVRLittleEndian );
-        }
-#endif
-      }
-    else if( rle )
-      {
-      if( lossy )
-        {
-        std::cerr << "no such thing as rle & lossy" << std::endl;
-        return 1;
-        }
-      change.SetTransferSyntax( gdcm::TransferSyntax::RLELossless );
-      }
-    else if( deflated )
-      {
-      if( lossy )
-        {
-        std::cerr << "no such thing as deflated & lossy" << std::endl;
-        return 1;
-        }
-      change.SetTransferSyntax( gdcm::TransferSyntax::DeflatedExplicitVRLittleEndian );
-      }
-    else if( force )
-      {
-      // If image is encapsulated it will check some attribute (col/row/pi/pf) and
-      // some attributes...
-      }
-    else
-      {
-      std::cerr << "unhandled action" << std::endl;
-      return 1;
-      }
-    if( raw && planarconf )
-      {
-      gdcm::ImageChangePlanarConfiguration icpc;
-      icpc.SetPlanarConfiguration( planarconfval );
-      icpc.SetInput( image );
-      bool b = icpc.Change();
-      if( !b )
-        {
-        std::cerr << "Could not change the Planar Configuration: " << filename << std::endl;
-        return 1;
-        }
-      change.SetInput( icpc.PixmapToPixmapFilter::GetOutput() );
-      }
-    else
-      {
-      change.SetInput( image );
-      }
-    bool b = change.Change();
-    if( !b )
-      {
-      std::cerr << "Could not change the Transfer Syntax: " << filename << std::endl;
-      return 1;
-      }
-    if( lossy )
-      {
-      if(!quiet)
-        PrintLossyWarning();
-      if( !gdcm::derives( reader.GetFile(), change.PixmapToPixmapFilter::GetOutput() ) )
-        {
-        std::cerr << "Failed to derives: " << filename << std::endl;
-        return 1;
-        }
-      }
-    if( usedict /*ts.IsImplicit()*/ )
-      {
-      gdcm::FileExplicitFilter fef;
-      fef.SetChangePrivateTags( (changeprivatetags > 0 ? true : false));
-      fef.SetFile( reader.GetFile() );
-      if(!fef.Change())
-        {
-        std::cerr << "Failed to change: " << filename << std::endl;
-        return 1;
-        }
-      }
-
-    gdcm::PixmapWriter writer;
-    writer.SetFileName( outfilename.c_str() );
-    writer.SetFile( reader.GetFile() );
-    //writer.SetFile( fef.GetFile() );
-
-    gdcm::File & file = writer.GetFile();
-    gdcm::FileMetaInformation &fmi = file.GetHeader();
-    fmi.Remove( gdcm::Tag(0x0002,0x0100) ); //  '   '    ' // PrivateInformationCreatorUID
-    fmi.Remove( gdcm::Tag(0x0002,0x0102) ); //  '   '    ' // PrivateInformation
-
-    const gdcm::Pixmap &pixout = change.PixmapToPixmapFilter::GetOutput();
-    writer.SetPixmap( pixout );
-    if( !writer.Write() )
-      {
-      std::cerr << "Failed to write: " << outfilename << std::endl;
-      return 1;
-      }
-
-    }
-  else if( raw && false )
-    {
-    gdcm::PixmapReader reader;
-    reader.SetFileName( filename.c_str() );
-    if( !reader.Read() )
-      {
-      std::cerr << "Could not read (pixmap): " << filename << std::endl;
-      return 1;
-      }
-
-    const gdcm::Pixmap &ir = reader.GetPixmap();
-
-    gdcm::Pixmap image( ir );
-    const gdcm::TransferSyntax &ts = ir.GetTransferSyntax();
-    if( ts.IsExplicit() )
-      {
-      image.SetTransferSyntax( gdcm::TransferSyntax::ExplicitVRLittleEndian );
-      }
-    else
-      {
-      gdcm_assert( ts.IsImplicit() );
-      image.SetTransferSyntax( gdcm::TransferSyntax::ImplicitVRLittleEndian );
-      }
-
-/*
-    image.SetNumberOfDimensions( ir.GetNumberOfDimensions() );
-
-    const unsigned int *dims = ir.GetDimensions();
-    image.SetDimension(0, dims[0] );
-    image.SetDimension(1, dims[1] );
-
-    const gdcm::PixelFormat &pixeltype = ir.GetPixelFormat();
-    image.SetPixelFormat( pixeltype );
-
-    const gdcm::PhotometricInterpretation &pi = ir.GetPhotometricInterpretation();
-    image.SetPhotometricInterpretation( pi );
-*/
-
-    unsigned long len = ir.GetBufferLength();
-    //gdcm_assert( len = ir.GetBufferLength() );
-    std::vector<char> buffer;
-    buffer.resize(len); // black image
-
-    ir.GetBuffer( buffer.data() );
-    gdcm::ByteValue *bv = new gdcm::ByteValue(buffer);
-    gdcm::DataElement pixeldata( gdcm::Tag(0x7fe0,0x0010) );
-    pixeldata.SetValue( *bv );
-    image.SetDataElement( pixeldata );
-
-    gdcm::PixmapWriter writer;
-    writer.SetFile( reader.GetFile() );
-    writer.SetPixmap( image );
-    writer.SetFileName( outfilename.c_str() );
-
-    if( !writer.Write() )
-      {
-      std::cerr << "could not write: " << outfilename << std::endl;
-      return 1;
-      }
-    }
-  else
-    {
-    gdcm::Reader reader;
-    reader.SetFileName( filename.c_str() );
-    if( !reader.Read() )
-      {
-      if( ignoreerrors )
-        {
-        std::cerr << "WARNING: an error was found during the reading of your DICOM file." << std::endl;
-        std::cerr << "gdcmconv will still try to continue and rewrite your DICOM file." << std::endl;
-        std::cerr << "There is absolutely no guarantee that your output file will be valid." << std::endl;
-        }
-      else
-        {
-        std::cerr << "Failed to read: " << filename << std::endl;
-        return 1;
-        }
-      }
-    gdcm::MediaStorage ms;
-    ms.SetFromFile( reader.GetFile() );
-    if( ms == gdcm::MediaStorage::MediaStorageDirectoryStorage )
-      {
-      std::cerr << "Sorry DICOMDIR is not supported" << std::endl;
-      return 1;
-      }
-
-#if 0
-    // if preamble create:
-    gdcm::File f(reader.GetFile());
-    gdcm::Preamble p;
-    p.Create();
-    f.SetPreamble(p);
-    gdcm::DataSet ds = reader.GetFile().GetDataSet();
-    SetSQToUndefined undef;
-    ds.ExecuteOperation(undef);
-
-    gdcm::File f(reader.GetFile());
-    f.SetDataSet(ds);
-#endif
-
-#if 0
-    gdcm::DataSet& ds = reader.GetFile().GetDataSet();
-    gdcm::DataElement de = ds.GetDataElement( gdcm::Tag(0x0010,0x0010) );
-    const char patname[] = "John^Doe";
-    de.SetByteValue(patname, strlen(patname));
-    std::cout << de << std::endl;
-
-    ds.Replace( de );
-    std::cout << ds.GetDataElement( gdcm::Tag(0x0010,0x0010) ) << std::endl;
-#endif
-
-    /*
-    //(0020,0032) DS [-158.135803\-179.035797\-75.699997]     #  34, 3 ImagePositionPatient
-    //(0020,0037) DS [1.000000\0.000000\0.000000\0.000000\1.000000\0.000000] #  54, 6 ImageOrientationPatient
-    gdcm::Attribute<0x0020,0x0032> at = { -158.135803, -179.035797, -75.699997 };
-    gdcm::DataElement ipp = at.GetAsDataElement();
-    ds.Remove( at.GetTag() );
-    ds.Remove( ipp.GetTag() );
-    ds.Replace( ipp );
-     */
-
-    gdcm::Writer writer;
-    writer.SetFileName( outfilename.c_str() );
-    writer.SetCheckFileMetaInformation( (checkmeta > 0 ? true : false));
-    //writer.SetFile( f );
-    writer.SetFile( reader.GetFile() );
-    if( !writer.Write() )
-      {
-      std::cerr << "Failed to write: " << outfilename << std::endl;
-      // remove file to avoid any temptation
-      if( filename != outfilename )
-        {
-        gdcm::System::RemoveFile( outfilename.c_str() );
-        }
-      else
-        {
-        std::cerr << "gdcmconv just corrupted: " << filename << " for you (data lost)." << std::endl;
-        }
-      return 1;
-      }
-    }
-
-  return 0;
 }
