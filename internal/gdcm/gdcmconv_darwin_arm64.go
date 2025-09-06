@@ -53,26 +53,13 @@ import "C"
 import (
 	"fmt"
 	"unsafe"
-)
 
-// CompressionType represents different compression algorithms
-type CompressionType int
-
-const (
-	CompressionRaw CompressionType = iota
-	CompressionJPEGLossy
-	CompressionJPEGLossless
-	CompressionJPEG2000Lossy
-	CompressionJPEG2000Lossless
-	CompressionJPEGLSLossy
-	CompressionJPEGLSLossless
-	CompressionRLE
-	CompressionDeflated
+	"github.com/caio-sobreiro/gdcmconv-go/internal/types"
 )
 
 // ConvertOptions holds options for DICOM conversion
 type ConvertOptions struct {
-	Compression   CompressionType
+	Compression   types.CompressionType
 	QualityOrRate float64 // For lossy compression: quality (0-100) or rate for JPEG2000
 }
 
@@ -96,36 +83,6 @@ func ConvertImage(inputPath, outputPath string, opts ConvertOptions) error {
 	}
 
 	return nil
-}
-
-// ConvertToJPEG2000 is a convenience function for JPEG2000 lossless conversion
-func ConvertToJPEG2000(inputPath string, outputPath string) error {
-	return ConvertImage(inputPath, outputPath, ConvertOptions{
-		Compression: CompressionJPEG2000Lossless,
-	})
-}
-
-// ConvertToJPEG2000Lossy converts to JPEG2000 with specified quality
-func ConvertToJPEG2000Lossy(inputPath string, outputPath string, quality float64) error {
-	return ConvertImage(inputPath, outputPath, ConvertOptions{
-		Compression:   CompressionJPEG2000Lossy,
-		QualityOrRate: quality,
-	})
-}
-
-// ConvertToJPEG converts to JPEG with specified quality
-func ConvertToJPEG(inputPath string, outputPath string, quality float64) error {
-	return ConvertImage(inputPath, outputPath, ConvertOptions{
-		Compression:   CompressionJPEGLossy,
-		QualityOrRate: quality,
-	})
-}
-
-// ConvertToRaw decompresses the image to raw format
-func ConvertToRaw(inputPath string, outputPath string) error {
-	return ConvertImage(inputPath, outputPath, ConvertOptions{
-		Compression: CompressionRaw,
-	})
 }
 
 // ConvertTransferSyntax changes the transfer syntax without compression
