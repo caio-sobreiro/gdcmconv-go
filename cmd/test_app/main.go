@@ -3,13 +3,15 @@ package main
 import (
 	"fmt"
 
+	"github.com/caio-sobreiro/gdcmconv-go"
 	"github.com/caio-sobreiro/gdcmconv-go/internal/gdcm"
+	"github.com/caio-sobreiro/gdcmconv-go/internal/types"
 )
 
 func main() {
 	// Example 1: Simple JPEG2000 lossless conversion (backwards compatible)
 	fmt.Println("Converting to JPEG2000 lossless...")
-	err := gdcm.ConvertToJPEG2000("input.dcm", "output-j2k-lossless-go.dcm")
+	err := gdcmconv.ConvertToJPEG2000("input.dcm", "output-j2k-lossless-go.dcm")
 	if err != nil {
 		fmt.Printf("JPEG2000 lossless conversion failed: %s\n", err.Error())
 	} else {
@@ -18,7 +20,7 @@ func main() {
 
 	// Example 2: JPEG2000 lossy conversion with quality setting
 	fmt.Println("Converting to JPEG2000 lossy...")
-	err = gdcm.ConvertToJPEG2000Lossy("input.dcm", "output-j2k-lossy-go.dcm", 50.0)
+	err = gdcmconv.ConvertToJPEG2000Lossy("input.dcm", "output-j2k-lossy-go.dcm", 50.0)
 	if err != nil {
 		fmt.Printf("JPEG2000 lossy conversion failed: %s\n", err.Error())
 	} else {
@@ -27,7 +29,7 @@ func main() {
 
 	// Example 3: JPEG conversion with quality setting
 	fmt.Println("Converting to JPEG...")
-	err = gdcm.ConvertToJPEG("input.dcm", "output-jpeg-go.dcm", 80.0)
+	err = gdcmconv.ConvertToJPEG("input.dcm", "output-jpeg-go.dcm", 80.0)
 	if err != nil {
 		fmt.Printf("JPEG conversion failed: %s\n", err.Error())
 	} else {
@@ -36,7 +38,7 @@ func main() {
 
 	// Example 4: Decompress to raw format
 	fmt.Println("Converting to raw format...")
-	err = gdcm.ConvertToRaw("input.dcm", "output-raw-go.dcm")
+	err = gdcmconv.ConvertToRaw("input.dcm", "output-raw-go.dcm")
 	if err != nil {
 		fmt.Printf("Raw conversion failed: %s\n", err.Error())
 	} else {
@@ -46,7 +48,7 @@ func main() {
 	// Example 5: Using the generic ConvertImage function with custom options
 	fmt.Println("Converting with custom options...")
 	err = gdcm.ConvertImage("input.dcm", "output-custom-go.dcm", gdcm.ConvertOptions{
-		Compression:   gdcm.CompressionRLE,
+		Compression:   types.CompressionRLE,
 		QualityOrRate: 0, // Not used for RLE
 	})
 	if err != nil {

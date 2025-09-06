@@ -34,5 +34,4 @@ go.work.sum
 /build/
 /scripts/build_gdcm.sh.log
 
-input.dcm
-output.dcm
+*.dcm
