@@ -10,6 +10,7 @@
 - **High performance**: Leverages the mature and optimized GDCM C++ library
 
 ## Roadmap
+- [ ] Full support for the main OS/ARCH combinations (Linux, Windows, MacOS on amd64 and arm64)
 - [ ] Achieve full test coverage for all transcoding and utility functions
 - [ ] Add CI to ensure cross-platform builds and test runs
 - [ ] Publish performance benchmarks
