@@ -9,6 +9,12 @@
 - **LUT (Lookup Table) operations**: Apply LUT transformations to DICOM images
 - **High performance**: Leverages the mature and optimized GDCM C++ library
 
+## Roadmap
+- [ ] Achieve full test coverage for all transcoding and utility functions
+- [ ] Add CI to ensure cross-platform builds and test runs
+- [ ] Publish performance benchmarks
+- [ ] Provide more usage examples and documentation
+
 ## Installation
 
 This package requires the ability to build CGO projects, and pre-built GDCM object files for supported OS/ARCH combinations are included in this repository.
@@ -72,12 +78,6 @@ err := gdcmconv.RemoveTags("input.dcm", "output.dcm", gdcmconv.RemoveTagsOptions
 - **Performance**: Native code for fast transcoding
 - **Simplicity**: Go API abstracts away C++ and command-line details
 - **Flexibility**: Supports a wide range of DICOM compression and transformation workflows
-
-## Roadmap
-- [ ] Achieve full test coverage for all transcoding and utility functions
-- [ ] Add CI to ensure cross-platform builds and test runs
-- [ ] Publish performance benchmarks
-- [ ] Provide more usage examples and documentation
 
 ## License
 
