@@ -15,12 +15,16 @@ cmake -S "$GDCM_SRC_DIR" -B "$BUILD_DIR" \
 
 cmake --build "$BUILD_DIR" --parallel
 
+arch=$(uname -m)
+os=$(uname -s | tr '[:upper:]' '[:lower:]')
+echo "Current OS/ARCH: $os/$arch"
+
 # Copy necessary .a files to prebuilt directory for darwin/arm64
-mkdir -p third_party/prebuilt/darwin_arm64
-cp build/gdcm/bin/libgdcm*.a third_party/prebuilt/darwin_arm64/
+mkdir -p third_party/prebuilt/"$os"_"$arch"
+cp build/gdcm/bin/libgdcm*.a third_party/prebuilt/"$os"_"$arch"/
 
 # Copy generated header files
-mkdir -p third_party/prebuilt/darwin_arm64/include
+mkdir -p third_party/prebuilt/"$os"_"$arch"/include
 mkdir -p third_party/prebuilt/include
 
 # Copy headers from the source and build directories (.h and .txx)
