@@ -1,5 +1,3 @@
-//go:build darwin && arm64
-
 package gdcm
 
 /*
@@ -13,7 +11,9 @@ package gdcm
 
 #cgo CXXFLAGS: -I${SRCDIR}/../../third_party/prebuilt/include
 
-#cgo LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/darwin_arm64
+#cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/darwin_arm64
+#cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/darwin_amd64
+
 #cgo LDFLAGS: -lgdcmMSFF -lgdcmDICT -lgdcmCommon -lgdcmuuid
 #cgo LDFLAGS: -lgdcmjpeg8 -lgdcmjpeg12 -lgdcmjpeg16 -lgdcmopenjp2 -lgdcmDSED -lgdcmexpat -lgdcmIOD
 #cgo LDFLAGS: -lgdcmMEXD -lgdcmzlib -lsocketxx -lgdcmcharls
