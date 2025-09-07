@@ -37,9 +37,9 @@
 
 /* Useful in particular for loadshared where the full path
  * to the lib is needed */
-#define GDCM_SOURCE_DIR "/Users/caio/dev/caio/gdcmconv-go/third_party/gdcm"
-#define GDCM_EXECUTABLE_OUTPUT_PATH "/Users/caio/dev/caio/gdcmconv-go/build/gdcm/bin"
-#define GDCM_LIBRARY_OUTPUT_PATH    "/Users/caio/dev/caio/gdcmconv-go/build/gdcm/bin"
+#define GDCM_SOURCE_DIR "./third_party/gdcm"
+#define GDCM_EXECUTABLE_OUTPUT_PATH "./build/gdcm/bin"
+#define GDCM_LIBRARY_OUTPUT_PATH  "./build/gdcm/bin"
 
 /* #undef GDCM_BUILD_TESTING */
 
@@ -62,7 +62,7 @@
 #ifndef GDCM_USE_SYSTEM_OPENJPEG
 #define OPENJPEG_VERSION_MAJOR 2
 #else
-#define OPENJPEG_VERSION_MAJOR 
+#define OPENJPEG_VERSION_MAJOR
 #endif //GDCM_USE_SYSTEM_OPENJPEG
 
 #ifndef OPENJPEG_VERSION_MAJOR
