@@ -73,6 +73,12 @@ err := gdcmconv.RemoveTags("input.dcm", "output.dcm", gdcmconv.RemoveTagsOptions
 - **Simplicity**: Go API abstracts away C++ and command-line details
 - **Flexibility**: Supports a wide range of DICOM compression and transformation workflows
 
+## Roadmap
+- [ ] Achieve full test coverage for all transcoding and utility functions
+- [ ] Add CI to ensure cross-platform builds and test runs
+- [ ] Publish performance benchmarks
+- [ ] Provide more usage examples and documentation
+
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
