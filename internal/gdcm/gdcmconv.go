@@ -13,6 +13,7 @@ package gdcm
 
 #cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/darwin_arm64
 #cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/linux_x86_64
+#cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/linux_aarch64
 
 #cgo LDFLAGS: -lgdcmMSFF -lgdcmDICT -lgdcmCommon -lgdcmIOD -lgdcmMEXD -lgdcmuuid
 #cgo LDFLAGS: -lgdcmjpeg8 -lgdcmjpeg12 -lgdcmjpeg16 -lgdcmopenjp2 -lgdcmDSED
