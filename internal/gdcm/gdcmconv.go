@@ -14,9 +14,9 @@ package gdcm
 #cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/darwin_arm64
 #cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/linux_x86_64
 
-#cgo LDFLAGS: -lgdcmMSFF -lgdcmDICT -lgdcmCommon -lgdcmuuid
-#cgo LDFLAGS: -lgdcmjpeg8 -lgdcmjpeg12 -lgdcmjpeg16 -lgdcmopenjp2 -lgdcmDSED -lgdcmexpat -lgdcmIOD
-#cgo LDFLAGS: -lgdcmMEXD -lgdcmzlib -lsocketxx -lgdcmcharls
+#cgo LDFLAGS: -lgdcmMSFF -lgdcmDICT -lgdcmCommon -lgdcmIOD -lgdcmMEXD -lgdcmuuid
+#cgo LDFLAGS: -lgdcmjpeg8 -lgdcmjpeg12 -lgdcmjpeg16 -lgdcmopenjp2 -lgdcmDSED
+#cgo LDFLAGS: -lgdcmexpat -lgdcmmd5 -lgdcmzlib -lsocketxx -lgdcmcharls -lpthread
 
 #include <stdlib.h>
 
