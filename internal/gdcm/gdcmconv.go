@@ -19,9 +19,12 @@ package gdcm
 #cgo linux,amd64 LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/linux_x86_64
 #cgo linux,arm64 LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/linux_aarch64
 
+#cgo darwin LDFLAGS: -framework CoreFoundation
+#cgo linux LDFLAGS: -lpthread
+
 #cgo LDFLAGS: -lgdcmMSFF -lgdcmDICT -lgdcmCommon -lgdcmIOD -lgdcmMEXD -lgdcmuuid
 #cgo LDFLAGS: -lgdcmjpeg8 -lgdcmjpeg12 -lgdcmjpeg16 -lgdcmopenjp2 -lgdcmDSED
-#cgo LDFLAGS: -lgdcmexpat -lgdcmmd5 -lgdcmzlib -lsocketxx -lgdcmcharls -lpthread
+#cgo LDFLAGS: -lgdcmexpat -lgdcmmd5 -lgdcmzlib -lsocketxx -lgdcmcharls
 
 #include <stdlib.h>
 
