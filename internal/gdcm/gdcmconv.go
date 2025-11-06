@@ -9,7 +9,10 @@ package gdcm
 #cgo CXXFLAGS: -I${SRCDIR}/../../third_party/gdcm/Source/MediaStorageAndFileFormat
 #cgo CXXFLAGS: -I${SRCDIR}/../../third_party/gdcm/Source/MessageExchangeDefinition
 
-#cgo CXXFLAGS: -I${SRCDIR}/../../third_party/prebuilt/include
+#cgo darwin,arm64 CXXFLAGS: -I${SRCDIR}/../../third_party/prebuilt/include/darwin_arm64
+#cgo darwin,amd64 CXXFLAGS: -I${SRCDIR}/../../third_party/prebuilt/include/darwin_x86_64
+#cgo linux,amd64 CXXFLAGS: -I${SRCDIR}/../../third_party/prebuilt/include/linux_x86_64
+#cgo linux,arm64 CXXFLAGS: -I${SRCDIR}/../../third_party/prebuilt/include/linux_aarch64
 
 #cgo darwin,arm64 LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/darwin_arm64
 #cgo darwin,amd64 LDFLAGS: -L${SRCDIR}/../../third_party/prebuilt/darwin_x86_64

@@ -21,4 +21,4 @@ for target in $TARGETS; do
 
 done
 
-echo "\nAll builds completed."
+echo "All builds completed."
