@@ -1,0 +1,18 @@
+services:
+  test-linux-arm64:
+    build: .
+    platform: linux/arm64
+    command: ["go", "run", "./cmd/multi_platform_test"]
+    environment:
+      CGO_ENABLED: "1"
+    volumes:
+      - ./third_party/prebuilt:/app/third_party/prebuilt:rw
+
+  test-linux-amd64:
+    build: .
+    platform: linux/amd64
+    command: ["go", "run", "./cmd/multi_platform_test"]
+    environment:
+      CGO_ENABLED: "1"
+    volumes:
+      - ./third_party/prebuilt:/app/third_party/prebuilt:rw

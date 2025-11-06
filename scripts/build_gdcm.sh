@@ -9,12 +9,13 @@ mkdir -p "$BUILD_DIR"
 cmake -S "$GDCM_SRC_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \
   -DGDCM_BUILD_SHARED_LIBS=OFF \
+  -DBUILD_SHARED_LIBS=OFF \
   -DGDCM_BUILD_APPLICATIONS=OFF \
   -DGDCM_BUILD_EXAMPLES=OFF \
-  -DGDCM_BUILD_TESTING=OFF \
+  -DGDCM_BUILD_TESTING=ON \
   -DGDCM_USE_BUILTIN_BSWAP=ON
 
-cmake --build "$BUILD_DIR" --parallel
+cmake --build "$BUILD_DIR"
 
 arch=$(uname -m)
 os=$(uname -s | tr '[:upper:]' '[:lower:]')
@@ -23,9 +24,11 @@ echo "Current OS/ARCH: $os/$arch"
 # Copy necessary .a files to prebuilt directory for darwin/arm64
 mkdir -p third_party/prebuilt/"$os"_"$arch"
 cp build/gdcm/bin/libgdcm*.a third_party/prebuilt/"$os"_"$arch"/
+if [ -f build/gdcm/bin/libsocketxx.a ]; then
+  cp build/gdcm/bin/libsocketxx.a third_party/prebuilt/"$os"_"$arch"/
+fi
 
 # Copy generated header files
-mkdir -p third_party/prebuilt/"$os"_"$arch"/include
 mkdir -p third_party/prebuilt/include
 
 # Copy headers from the source and build directories (.h and .txx)
