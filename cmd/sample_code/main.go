@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/caio-sobreiro/gdcmconv-go"
-	"github.com/caio-sobreiro/gdcmconv-go/internal/gdcm"
-	"github.com/caio-sobreiro/gdcmconv-go/internal/types"
 )
 
 func main() {
@@ -47,8 +45,8 @@ func main() {
 
 	// Example 5: Using the generic ConvertImage function with custom options
 	fmt.Println("Converting with custom options...")
-	err = gdcm.ConvertImage("input.dcm", "output-custom-go.dcm", gdcm.ConvertOptions{
-		Compression:   types.CompressionRLE,
+	err = gdcmconv.ConvertImage("input.dcm", "output-custom-go.dcm", gdcmconv.ConvertOptions{
+		Compression:   gdcmconv.CompressionRLE,
 		QualityOrRate: 0, // Not used for RLE
 	})
 	if err != nil {
@@ -59,7 +57,7 @@ func main() {
 
 	// Example 6: Remove private tags
 	fmt.Println("Removing private tags...")
-	err = gdcm.RemoveTags("input.dcm", "output-no-private-go.dcm", gdcm.RemoveTagsOptions{
+	err = gdcmconv.RemoveTags("input.dcm", "output-no-private-go.dcm", gdcmconv.RemoveTagsOptions{
 		RemovePrivate:     true,
 		RemoveRetired:     false,
 		RemoveGroupLength: false,
@@ -72,7 +70,7 @@ func main() {
 
 	// Example 7: Apply LUT transformation
 	fmt.Println("Applying LUT transformation...")
-	err = gdcm.ApplyLUT("input.dcm", "output-lut-go.dcm", false)
+	err = gdcmconv.ApplyLUT("input.dcm", "output-lut-go.dcm", false)
 	if err != nil {
 		fmt.Printf("LUT application failed: %s\n", err.Error())
 	} else {
