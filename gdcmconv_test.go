@@ -93,10 +93,10 @@ func TestAdvancedOperations(t *testing.T) {
 		}
 	})
 
-	t.Run("ConvertTransferSyntax", func(t *testing.T) {
+	t.Run("ConvertDatasetTransferSyntax", func(t *testing.T) {
 		output := filepath.Join(outDir, "transfer-syntax.dcm")
-		if err := ConvertTransferSyntax(input, output, true, false); err != nil {
-			t.Fatalf("ConvertTransferSyntax failed: %v", err)
+		if err := ConvertDatasetTransferSyntax(input, output, TransferSyntaxExplicitVRLittleEndian); err != nil {
+			t.Fatalf("ConvertDatasetTransferSyntax failed: %v", err)
 		}
 		if _, err := os.Stat(output); err != nil {
 			t.Fatalf("expected output file to exist: %v", err)

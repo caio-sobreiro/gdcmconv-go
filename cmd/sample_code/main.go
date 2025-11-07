@@ -77,5 +77,14 @@ func main() {
 		fmt.Println("✓ LUT transformation successful")
 	}
 
+	// Example 8: Convert dataset transfer syntax
+	fmt.Println("Converting dataset transfer syntax to explicit VR...")
+	err = gdcmconv.ConvertDatasetTransferSyntax("input.dcm", "output-explicit-ts-go.dcm", gdcmconv.TransferSyntaxExplicitVRLittleEndian)
+	if err != nil {
+		fmt.Printf("Transfer syntax rewrite failed: %s\n", err.Error())
+	} else {
+		fmt.Println("✓ Transfer syntax rewrite successful")
+	}
+
 	fmt.Println("\nAll conversions completed!")
 }

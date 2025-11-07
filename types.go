@@ -25,3 +25,11 @@ type ConvertOptions = gdcm.ConvertOptions
 
 // RemoveTagsOptions configures how RemoveTags behaves.
 type RemoveTagsOptions = gdcm.RemoveTagsOptions
+
+// TransferSyntaxPreset enumerates the little-endian transfer syntaxes exposed by the wrapper.
+type TransferSyntaxPreset int
+
+const (
+	TransferSyntaxImplicitVRLittleEndian TransferSyntaxPreset = iota
+	TransferSyntaxExplicitVRLittleEndian
+)
