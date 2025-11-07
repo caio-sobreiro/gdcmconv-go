@@ -11,9 +11,10 @@
 - **High performance**: Leverages the mature and optimized GDCM C++ library
 
 ## Roadmap
-- [x] Multi-platform static builds for macOS arm64 + Linux amd64/arm64
+- [x] Multi-platform static builds for macOS amd64/arm64 + Linux amd64/arm64
 - [x] Public Go API with reusable Convert/Transfer/LUT/Tag helpers
 - [x] Integration-style smoke tests covering core flows (`go test ./...`)
+- [ ] Windows support
 - [ ] Expand fixtures to cover JPEG + LUT workflows
 - [ ] Add CI to exercise cross-platform builds and test runs
 - [ ] Publish performance benchmarks
